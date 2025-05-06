@@ -1,0 +1,262 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+#Preprocess
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+from imblearn.over_sampling import SMOTE
+#KNN
+from sklearn.neighbors import KNeighborsClassifier
+#LogReg
+from sklearn.linear_model import LogisticRegression
+#Bagging & Boosting
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import AdaBoostClassifier
+#Random Forest
+from sklearn.ensemble import RandomForestClassifier
+#Evaluation
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score
+
+global labelDeathDuration
+labelDeathDuration = 360
+
+def loadData():
+    #SUBJECT_ID, GENDER, DOB, DOD, EXPIRE_FLAG
+    patients = pd.read_csv('MIMIC-3/dataset/PATIENTS/PATIENTS_sorted.csv')
+    patients = patients[['SUBJECT_ID', 'GENDER', 'DOB', 'DOD', 'EXPIRE_FLAG']].copy()
+    #SUBJECT_ID, ADMITTIME, ADMISSION_TYPE, INSURANCE, LANGUAGE, RELIGION, ETHNICITY 
+    admissions = pd.read_csv('MIMIC-3/dataset/ADMISSIONS/ADMISSIONS_sorted.csv')
+    admissions = admissions[['SUBJECT_ID', 'ADMITTIME', 'ADMISSION_TYPE', 'ADMISSION_LOCATION', 'INSURANCE', 'LANGUAGE', 'RELIGION', 'MARITAL_STATUS', 'ETHNICITY']].copy()
+    #SUBJECT_ID, HADM_ID, SEQ_NUM, ICD9_CODE
+    diagnoses = pd.read_csv('MIMIC-3/dataset/DIAGNOSES_ICD/DIAGNOSES_ICD_sorted.csv')
+    diagnoses = diagnoses[['SUBJECT_ID', 'HADM_ID', 'SEQ_NUM', 'ICD9_CODE']].copy()
+
+    return patients, admissions, diagnoses
+
+def labelDeath(row):
+    global labelDeathDuration
+    if pd.isnull(row['DOD']) or pd.isnull(row['ADMITTIME']):
+        return 0
+
+    duration = (row['DOD'] - row['ADMITTIME']).days
+    return 1 if duration >= 0 and duration <= labelDeathDuration else 0
+
+def mergeLabel(patients, admissions, diagnoses):
+    patients['DOD'] = pd.to_datetime(patients['DOD'], errors='coerce')
+    admissions['ADMITTIME'] = pd.to_datetime(admissions['ADMITTIME'], errors='coerce')
+
+    admissions_patients = admissions.merge(patients, on='SUBJECT_ID', how='left')
+    admissions_patients_diagnoses = admissions_patients.merge(diagnoses, on='SUBJECT_ID', how='left')
+
+    admissions_patients_diagnoses['DEAD_AFTER_DURATION'] = admissions_patients_diagnoses.apply(labelDeath, axis=1)
+
+    return admissions_patients_diagnoses
+
+def preprocess(df):
+    numerical = ['HADM_ID', 'SEQ_NUM']
+    catagorical = ['GENDER', 'ADMISSION_TYPE', 'ADMISSION_LOCATION', 'INSURANCE', 'LANGUAGE', 'RELIGION', 'MARITAL_STATUS', 'ETHNICITY', 'ICD9_CODE']
+
+    for col in catagorical:
+        df[col] = df[col].fillna('UNKNOWN')
+        le = LabelEncoder()
+        df[col] = le.fit_transform(df[col])
+
+    #?REMOVE THIS FOR FULL DATA
+    #df = df.iloc[:1000]
+
+    return df
+
+def featuresTarget(df):
+    features = ['GENDER', 'ADMISSION_TYPE', 'ADMISSION_LOCATION', 'INSURANCE', 'LANGUAGE', 'RELIGION', 'MARITAL_STATUS', 'ETHNICITY', 'HADM_ID', 'SEQ_NUM', 'ICD9_CODE']
+
+    X = df[features].copy()
+    Y = df['DEAD_AFTER_DURATION'].copy()
+    return X, Y
+
+def splitScale(X, Y):
+    X_train_eval, X_test, Y_train_eval, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+    X_train, X_eval, Y_train, Y_eval = train_test_split(X_train_eval, Y_train_eval, test_size=0.5, random_state=42)
+
+    imputer = SimpleImputer(strategy='most_frequent')
+    X_train = pd.DataFrame(imputer.fit_transform(X_train), columns=X.columns)
+    X_test = pd.DataFrame(imputer.transform(X_test), columns=X.columns)
+    X_eval = pd.DataFrame(imputer.transform(X_eval), columns=X.columns)
+
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(X_train)
+    X_test = scaler.transform(X_test)
+    X_eval = scaler.transform(X_eval)
+
+    return X_train, X_test, X_eval, Y_train, Y_test, Y_eval
+
+def tune_model(model, params, X_train, Y_train, cv=5, scoring='roc_auc'):
+    grid_search = GridSearchCV(model, params, cv=cv, scoring=scoring, n_jobs=-1)
+    grid_search.fit(X_train, Y_train)
+    return grid_search.best_estimator_
+
+def rocAuc(model, X, Y):
+    #Not all scikit functions have predict_proba :(((
+    if hasattr(model, 'predict_proba'):
+        Y_pred = model.predict_proba(X)[:, 1]
+    elif hasattr(model, 'decision_function'):
+        Y_pred = model.decision_function(X)
+    else:
+        return None
+    return roc_auc_score(Y, Y_pred)
+
+def evaluate(model, X_test, Y_test):
+    Y_pred = model.predict(X_test)
+    acc = accuracy_score(Y_test, Y_pred)
+    report = classification_report(Y_test, Y_pred, output_dict=True)
+    weighted_f1 = report['weighted avg']['f1-score']
+    print('Accuracy:', acc)
+    print('Classification Report:')
+    #Inefficient but oh well idk how to do dict conversions
+    print(classification_report(Y_test, Y_pred))
+    print('Confusion Matrix:')
+    print(confusion_matrix(Y_test, Y_pred))
+
+    auc = rocAuc(model, X_test, Y_test)
+    print('Auc:', auc)
+
+    return acc, weighted_f1, auc
+
+def zeroR(Y_train, Y_test):
+    majority_class = Y_train.mode()[0]
+    Y_pred = np.full_like(Y_test, majority_class)
+    acc = accuracy_score(Y_test, Y_pred)
+    report = classification_report(Y_test, Y_pred, output_dict=True)
+    weighted_f1 = report['weighted avg']['f1-score']
+    print('\n----- ZeroR Classifier -----')
+    print('Accuracy:', acc)
+    print('Classification Report:')
+    print(classification_report(Y_test, Y_pred))
+    print('Confusion Matrix:')
+    print(confusion_matrix(Y_test, Y_pred))
+
+    return acc, weighted_f1
+
+def main():
+    acc_list = []
+    weighted_f1_list = []
+    auc_list = []
+
+    patients, admissions, diagnoses = loadData()
+
+    df = mergeLabel(patients, admissions, diagnoses)
+
+    df = preprocess(df)
+
+    X, Y = featuresTarget(df)
+
+    X_train, X_test, X_val, Y_train, Y_test, Y_val = splitScale(X, Y) 
+
+    smote = SMOTE(random_state=42)
+    X_train, Y_train = smote.fit_resample(X_train, Y_train)
+    X_val, Y_val = smote.fit_resample(X_train, Y_train)
+
+    #ZeroR
+    test_acc, test_f1 = zeroR(Y_train, Y_test)
+
+    acc_list.append(test_acc)
+    weighted_f1_list.append(test_f1)
+    auc_list.append(0)
+
+    classifiers = {
+        'KNN': (KNeighborsClassifier(), {
+            'n_neighbors': [3, 5, 7, 9],
+            'weights': ['uniform', 'distance']
+        }),
+        'Logistic Regression': (LogisticRegression(), {
+            'penalty': ['l2'],
+            'C': [0.1, 1.0, 10.0],
+            'class_weight': ['balanced'],
+            'solver': ['lbfgs'],
+            'max_iter': [10000]
+        }),
+        # Uses decision tree classifier as default
+        'Bagging': (BaggingClassifier(), {
+            'n_estimators': [5, 10, 20]
+        }),
+        # Same as above
+        'Boosting': (AdaBoostClassifier(), {
+            'n_estimators': [50, 100, 150],
+            'learning_rate': [0.5, 1.0, 1.5]
+        }),
+        'Random Forest': (RandomForestClassifier(), {
+            'n_estimators': [50, 100, 150],
+            'max_depth': [None, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'class_weight': ['balanced']
+        })
+    }
+
+    for name, (model, params) in classifiers.items():
+        print(f'\n==================\n  {name} Classifier \n==================')
+        #First batch of training without validation set
+        first_tune_model = tune_model(model, 
+                                      params, 
+                                      X_train, 
+                                      Y_train, 
+                                      cv=5, 
+                                      scoring='accuracy')
+
+        #Now we can combine validation set with training set
+        X_train_full = np.concatenate((X_train, X_val))
+        Y_train_full = np.concatenate((Y_train, Y_val))
+
+        #Second batch of training with validation set
+        second_tune_model = tune_model(first_tune_model, 
+                                       params, 
+                                       X_train_full, 
+                                       Y_train_full, 
+                                       cv=5, 
+                                       scoring='accuracy')
+        test_acc, test_f1, auc = evaluate(second_tune_model, X_test, Y_test)
+
+        acc_list.append(test_acc)
+        weighted_f1_list.append(test_f1)
+        auc_list.append(auc)
+
+    #Plotting hehehehe
+    classifiers = ['ZeroR', 'KNN', 'Logistic Regression', 'Bagging', 'Boosting', 'Random Forest']
+
+    temp = []
+    for classifier in range(len(classifiers)):
+        temp.append(classifiers[classifier] + ' (' + str(round(acc_list[classifier], 2)) + ')')
+
+    plt.figure(figsize=(12, 5))
+    
+    plt.subplot(3, 1, 1)
+    plt.bar(temp, acc_list)
+    plt.title('Accuracy')
+    plt.ylabel('Accuracy Probability')
+    plt.ylim(0, 1)
+
+    temp = []
+    for classifier in range(len(classifiers)):
+        temp.append(classifiers[classifier] + ' (' + str(round(weighted_f1_list[classifier], 2)) + ')')
+
+    plt.subplot(3, 1, 2)
+    plt.bar(temp, weighted_f1_list)
+    plt.title('Weighted F1')
+    plt.ylabel('Weighted F1 Probability')
+    plt.ylim(0, 1)
+
+    temp = []
+    for classifier in range(len(classifiers)):
+        temp.append(classifiers[classifier] + ' (' + str(round(auc_list[classifier], 2)) + ')')
+
+    plt.subplot(3, 1, 3)
+    plt.bar(temp, auc_list)
+    plt.title('ROC-AUC')
+    plt.ylabel('ROC Area Under Curve')
+    plt.ylim(0, 1)
+
+    plt.tight_layout()
+    plt.show()
+
+main()
