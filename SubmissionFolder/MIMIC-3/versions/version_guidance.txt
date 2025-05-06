@@ -1,0 +1,137 @@
+SurvivalClassifiers
+* V1.0: Initial CPH Implementation
+    - Data preprocessing (Similar to Point)
+    - Implemented CoxPH on Dead Patient Data
+    - Accuracy measures for point analysis
+    - Hazard Plot
+    - Individual Survival Analysis
+    - C-index
+
+* V1.1: Added Features
+    - Introduced same features as point classifiers
+
+* V1.2: Added Right Censored Data
+    - Reformat pre-processing with right censoring 
+    - Add right censored training data to training
+
+* V1.3: Added extra performance metrics
+    - Brier Score
+    - ROC and AUC 
+    - MEA
+    - Move everything to SciKit
+
+* V1.4: Dynamic AUC 
+    - Added dynamic AUC 
+    - Added graph for Dynamic AUC
+
+* V2.0: RSF
+    - Added Random Survival Forest Classifier
+    - Integrated previous tests
+
+* V2.1: Input data changes
+    - Made data quantity and quality more similar to point classifiers
+    - Improved pre-processing code quality 
+
+* V2.2: Added Elastic-Net Cox 
+    - Added Elastic-Net Cox Classifier
+    - Integrated previous tests
+    - Added option to not calculate Dynamic AUC
+
+* V2.3: Scaling 
+    - Added scaling so models learn better
+
+* V2.4: Rollback data changes
+    - Remove a lot of quantity changes as they were reducing results
+    - Temporarily removed scaling since reduced data is quite well balanced
+
+* V2.5: Add data quantity back 
+    - Try adding based on admission rather than patient
+    - Added better log statements
+
+* V2.6: Revert changes and data tuning
+    - V2.5 was not working very well and produced bad results so reverted
+    - Added imputing and scaling
+
+* V3.0: Brier score 
+    - Added Brier score
+
+* V3.1: Cross-Validation and hyperparameter tuning
+    - Added validation set
+    - Added cross validation 
+    - Added hyperparameter tuning with GridSearchCV
+    - Brings Survival in line with Categorical
+
+ResultVisuals
+* V3.0: Line Chart
+    - Added line chart function 
+    - Displays different models performance on a metric
+    - Displays graphs on different metrics
+
+* V3.1: Mean Bar Chart 
+    - Added a bar chart function
+    - Displays mean values of different models 
+    - Has text of both standard deviation and mean 
+    - Displays graphs on different metrics
+
+* V3.2: IBS and C-Index Bar Chart
+    - Added a new bar chart function 
+    - Shows IBS and C-Index values of different models
+    - Displays graphs on different metrics
+
+* V3.3: Best Model Line Chart
+    - Created altered line chart function 
+    - Displays and compares the selected models 
+    - Displays graphs on different metrics
+
+CategoricalClassifiers
+* V1.0: Pre-processing and ZeroR
+    - Split the data with train and test data
+    - Label dead people after X days
+    - ZeroR classifier
+    - Basic analysis 
+
+* V1.1: KNN
+    - Added KNN Classifier
+    - Implemented evaluate function
+    - Added imputer 
+
+* V1.2: Logistic Regression
+    - Added logistic regression classifier
+
+* V1.3: Plotting 
+    - Added matplotlibs pyplot to show acc and weighted f1
+
+* V2.0: Reformatting for scalability
+    - Improved the code quality around training 
+    - Added cross validation
+
+* V2.1: Validation set and scaling
+    - Added validation set
+    - Run a two part training process to use validation set
+    - Added in scaling
+
+* V2.2: Added SMOTE
+    - Added SMOTE (Synthetic Minority Over-sampling Technique)
+
+* V2.3: Decision tree algorithms
+    - Added bagging
+    - Added boosting
+
+* V2.4: Random forest
+    - Added random forest classifier 
+
+* V2.5: ROC-AUC 
+    - Added ROC-AUC results for all classifiers 
+    - Exluded ZeroR for obvious reasons
+    - Added it to the plots
+
+* V3.0: Data reformat
+    - Changed the data to be more in line with graph classifiers
+
+* V3.1: Brier score 
+    - Added Brier score test to compare with graphs 
+    - Plotted Brier score
+
+* V3.2: Fixed validation 
+    - Changed the way the validation set is used 
+    - Make plotted results easier to read
