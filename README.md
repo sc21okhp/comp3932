@@ -3,6 +3,7 @@ GitHub Repository for SC21OKHP COMP3932 Synoptic Project (EPA) (38376)
 The report associated with this project can be found uploaded to GradeScope
   
 # Folder Structure  
+Within the SubmissionFolder is the MIMIC
 * dataset - This folder contains the 3 tables from the MIMIC-III-10k dataset used for the project  
 * results - This folder contains CSV files with the results obtained from testing the models  
 * versions - This folder contains the code  
@@ -20,7 +21,12 @@ A version control plaintext document can be found in the versions folder that co
   
 The latest version can be found by looking for the largest integer X after the V followed by the largest integer Y after the period such that VX.Y.py is a valid file name.  
   
-In order to run the file please navigate to the correct folder and type the following command in the command line:  
-```python v<X>.<Y>.py```
+In order to run the file please navigate to the /SubmissionFolder directory and type the following command in the command line:  
+```python /MIMIC-3/versions/<Chosen Folder>/v<X>.<Y>.py```
 
-Replacing X and Y with the chosen integers.  
+Where Chosen Folder is replaced with one of:
+* CategoricalClassifiers
+* ResultVisuals
+* SurvivalClassifiers
+
+And also replacing X and Y with the chosen integers.  
